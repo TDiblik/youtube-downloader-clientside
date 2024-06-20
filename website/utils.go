@@ -1,17 +1,38 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"log"
 	"net/url"
+	"os"
+	"os/exec"
 	"path"
 	"strings"
+	"time"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 var (
-	ErrUnableToParseUrl      = errors.New("unable_to_parse_provided_url")
-	ErrNotYoutubeUrl         = errors.New("provided_url_is_not_youtube")
-	ErrNoIdProvidedInsideUrl = errors.New("provided_url_does_not_include_id")
+	ErrUnableToParseUrl        = errors.New("unable_to_parse_provided_url")
+	ErrNotYoutubeUrl           = errors.New("provided_url_is_not_youtube")
+	ErrNoIdProvidedInsideUrl   = errors.New("provided_url_does_not_include_id")
+	ErrYtdlCommandFailed       = errors.New("ytdl_command_failed")
+	ErrYtdlUnableToParseStdout = errors.New("ytdl_unable_to_parse_stdout")
 )
+
+// Runs the command and exits on an error
+func RequireCommandExecution(command string) string {
+	stdout, err := exec.Command("bash", "-c", command).Output()
+	if err != nil {
+		log.Fatalf("Error running the command (%s): %s\n", command, err)
+		os.Exit(1)
+	}
+	stdout_string := strings.TrimSpace(string(stdout))
+	return stdout_string
+}
 
 func GetIdFromYoutubeUrl(query_url string) (string, error) {
 	parsed_url, err := url.Parse(query_url)
@@ -63,4 +84,39 @@ func IsYoutubeIdValid(id string) bool {
 	}
 
 	return true
+}
+
+// make sure to sanitize EVERYTHING before appending it to a command!
+// this actually executes shell commands on the server, if it's not sanitized properly,
+// it could lead to a nasty RCE!
+func GetYoutubeDownloadUrl(video_id string) (*YoutubeVideoMetadata, error) {
+	command := "yt-dlp -i --no-warnings --no-config-locations --no-cache-dir " +
+		" --socket-timeout 5 --retries 5 --retry-sleep 5 " +
+		" --force-ipv4 --no-playlist " +
+		" --proxy socks5://127.0.0.1:9050 -J " +
+		" \"https://www.youtube.com/watch?v=" + video_id + "\" "
+
+	// setup timeout for 30s. If I don't get a response by then, it's probably too late anyways
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	stdout, err := exec.CommandContext(ctx, "bash", "-c", command).Output()
+	if err != nil {
+		log.Fatalf("Error running the command (%s): %s\n", command, err)
+		return nil, ErrYtdlCommandFailed
+	}
+
+	var video_info YoutubeVideoMetadata
+	if err := json.Unmarshal(stdout, &video_info); err != nil {
+		log.Fatalf("Error while parsing stdout: \n ----------------- \n %s \n \n %s \n ----------------- \n", stdout, err)
+		return nil, ErrYtdlUnableToParseStdout
+	}
+
+	return &video_info, nil
+}
+
+func ErrTypeNotHandledResponse(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		"message": "Error type not handled on the server. Please report: https://github.com/TDiblik/youtube-downloader-clientside/issues/new",
+	})
 }
