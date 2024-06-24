@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/template/html/v2"
 	"github.com/patrickmn/go-cache"
 )
@@ -43,14 +44,14 @@ func main() {
 		Views: engine,
 	})
 
-	// app.Use(cors.New(cors.Config{
-	// 	// AllowOrigins: "https://gofiber.io, https://gofiber.net",
-	// 	// AllowOrigins: "*",
-	// 	// AllowOrigins: "https://*.googlevideo.com",
-	// 	// AllowHeaders: "*",
-	// 	// AllowHeaders: "Content-Type, Accept",
-	// 	// AllowMethods: fiber.MethodGet,
-	// }))
+	app.Use(cors.New(cors.Config{
+		// AllowOrigins: "https://gofiber.io, https://gofiber.net",
+		// AllowOrigins: "*",
+		// AllowOrigins: "https://*.googlevideo.com",
+		// AllowHeaders: "*",
+		// AllowHeaders: "Content-Type, Accept",
+		// AllowMethods: fiber.MethodGet,
+	}))
 
 	// app.Use(func(c fiber.Ctx) error {
 	// 	c.Set("Access-Control-Allow-Origin", "*")

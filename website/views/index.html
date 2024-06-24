@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download MP4 Video</title>
+</head>
+<body>
+    <h1>Download MP4 Video</h1>
+    <button id="downloadButton">Download Video</button>
+    <script>
+async function downloadVideoWithProgress(url, progressCallback) {
+    const init = {method: 'GET',mode: 'no-cors',cache: 'default'};
+    const response = await fetch(url, init);
+    // const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const contentLength = response.headers.get('content-length');
+    if (!contentLength) {
+        throw new Error('Content-Length response header unavailable');
+    }
+
+    const total = parseInt(contentLength, 10);
+    let loaded = 0;
+
+    const reader = response.body.getReader();
+    const stream = new ReadableStream({
+        start(controller) {
+            function push() {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        controller.close();
+                        return;
+                    }
+                    loaded += value.length;
+                    progressCallback(loaded / total);
+                    controller.enqueue(value);
+                    push();
+                }).catch(error => {
+                    console.error('Stream reading error:', error);
+                    controller.error(error);
+                });
+            }
+            push();
+        }
+    });
+
+    const responseStream = new Response(stream);
+    const videoBlob = await responseStream.blob();
+    return videoBlob;
+}
+        document.getElementById('downloadButton').addEventListener('click', async () => {
+            try {
+        // var link = document.createElement('a');
+        // link.href = videoUrl;
+        // link.download = 'out.mp4';
+        // document.body.appendChild(link); 
+        // link.click();
+        // document.body.removeChild(link);
+
+                const videoUrl = '';
+                // const response = await fetch(videoUrl);
+
+                // if (!response.ok) {
+                //     throw new Error('Network response was not ok ' + response.statusText);
+                // }
+                // console.log("a")
+
+                // // Get the video blob
+                // const videoBlob = await response.blob();
+                // console.log("a")
+downloadVideoWithProgress(videoUrl, progress => {
+    console.log(`Progress: ${(progress * 100).toFixed(2)}%`);
+}).then(videoBlob => {
+                const videoObjectUrl = URL.createObjectURL(videoBlob);
+
+                // Create a link element
+                const link = document.createElement('a');
+
+                // Set the download attribute with a filename
+                link.href = videoObjectUrl;
+                link.download = 'downloaded_video.mp4';
+
+                // Append the link to the body
+                document.body.appendChild(link);
+
+                // Programmatically click the link to trigger the download
+                link.click();
+
+                // Remove the link from the document
+                document.body.removeChild(link);
+    // Do something with the videoBlob
+}).catch(error => {
+    console.error('Download failed:', error);
+});
+
+                // Create a URL for the video blob
+            } catch (error) {
+                console.error('There has been a problem with your fetch operation:', error);
+            }
+        });
+    </script>
+</body>
+</html>
